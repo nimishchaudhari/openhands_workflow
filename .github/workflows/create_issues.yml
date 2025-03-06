@@ -1,4 +1,4 @@
-name: Create Issues from Comment
+name: Create Issues from Comment (github-script)
 
 on:
   issue_comment:
@@ -10,49 +10,77 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    - name: Set up Python
-      uses: actions/setup-python@v2
+    - name: Create issues using github-script
+      uses: actions/github-script@v6
       with:
-        python-version: '3.x'
+        script: |
+          const commentBody = context.payload.comment.body;
+          const match = commentBody.match(/\/create_issues\s*(\[\[.*?\]\])/);
+          if (!match) {
+            console.log('No issues found in the correct format.');
+            return;
+          }
 
-    - name: Install dependencies
-      run: pip install requests aiohttp
+          let issues;
+          try {
+            issues = JSON.parse(match[1]);
+            if (!Array.isArray(issues) || !issues.every(issue => Array.isArray(issue) && issue.length === 2 && issue.every(item => typeof item === 'string'))) {
+              throw new Error('Invalid issues format.');
+            }
+          } catch (error) {
+            console.error('Error parsing issues:', error);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Error parsing issues: ${error.message}`
+            });
+            return;
+          }
 
-    - name: Extract issues from comment
-      id: extract_issues
-      run: |
-        COMMENT_BODY="${{ github.event.comment.body }}"
-        ISSUES=$(echo "$COMMENT_BODY" | grep -oP '/create_issues\s*\K\[\[.*?\]\]' | head -1)
-        echo "ISSUES=$ISSUES" >> $GITHUB_ENV
-        echo "COMMENT_ID=${{ github.event.comment.id }}" >> $GITHUB_ENV
+          const createdIssues = [];
+          const failedIssues = [];
 
-    - name: Create scripts directory
-      run: mkdir -p scripts
+          for (const [title, body] of issues) {
+            try {
+              const { data: newIssue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+              createdIssues.push({ title: newIssue.title, url: newIssue.html_url });
+              console.log(`Issue '${title}' created successfully at ${newIssue.html_url}`);
+            } catch (error) {
+              console.error(`Failed to create issue '${title}':`, error);
+              failedIssues.push(title);
+            }
+          }
+          
+          let commentUpdateBody = '';
 
-    - name: Download create_issues.py
-      run: curl -L https://github.com/nimishchaudhari/openhands_workflow/raw/main/scripts/create_issues.py -o scripts/create_issues.py
+          if (createdIssues.length > 0) {
+            commentUpdateBody += 'The following issues were created:\n';
+            createdIssues.forEach((issue, index) => {
+              commentUpdateBody += `${index + 1}. [${issue.title}](${issue.url})\n`;
+            });
+          }
 
-    - name: Create "Work in Progress" comment
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        REPO_OWNER: ${{ github.repository_owner }}
-        REPO_NAME: ${{ github.event.repository.name }}
-        COMMENT_ID: ${{ env.COMMENT_ID }}
-      run: |
-        curl -X POST \
-        -H "Authorization: token $GITHUB_TOKEN" \
-        -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/issues/comments/$COMMENT_ID" \
-        -d '{"body": "Work in progress..."}'
+          if (failedIssues.length > 0) {
+            commentUpdateBody += '\nFailed to create the following issues:\n';
+            failedIssues.forEach(title => {
+              commentUpdateBody += `- ${title}\n`;
+            });
+          }
 
-    - name: Create issues
-      env:
-        REPO_OWNER: ${{ github.repository_owner }}
-        REPO_NAME: ${{ github.event.repository.name }}
-        AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        ISSUES: ${{ env.ISSUES }}
-        COMMENT_ID: ${{ env.COMMENT_ID }}
-      run: python scripts/create_issues.py
+          if (createdIssues.length === 0 && failedIssues.length === 0)
+          {
+            commentUpdateBody += 'No issues were created.'
+          }
+
+          await github.rest.issues.updateComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            comment_id: context.payload.comment.id,
+            body: commentUpdateBody,
+          });

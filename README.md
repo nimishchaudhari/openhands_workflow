@@ -8,6 +8,7 @@ This repository contains the necessary files and scripts to implement the OpenHa
 
 - **GitHub Actions Workflow**: Automates the resolution of issues using the OpenHands resolver.
 - **Scripts**: Tools to facilitate the creation of GitHub issues and other automation tasks.
+- **Create Issues Action**: A GitHub Action to create issues from comments.
 
 ## Prerequisites
 
@@ -30,8 +31,6 @@ Before you begin, ensure you have the following:
 
 The workflow file is a template that may require customization to align with your project's specific needs. Key sections to consider adjusting include:
 
-- **Triggers**: Define the conditions under which the workflow should execute, such as on every push to the main branch or upon a pull request.
-- **Jobs**: Specify the tasks the workflow should perform, which may include running tests, linting code, or deploying applications.
 - **Environment**: Configure the necessary environment variables and secrets to support your jobs.
 
 ### Step 3: Commit and Push
@@ -44,25 +43,17 @@ git commit -m "Add OpenHands resolver workflow"
 git push origin main
 ```
 
-## Utilizing the OpenHands Resolver
+### Set Up GitHub Secrets
 
-To effectively leverage the OpenHands GitHub Action within your repository, follow these steps:
+To ensure the workflow functions correctly, set up the following GitHub secrets in your repository settings:
 
-1. **Create an Issue**: Initiate the process by creating an issue in your repository that outlines the problem or task requiring resolution.
-2. **Add the `fix-me` Label**: Apply the `fix-me` label to the issue to trigger the OpenHands resolver.
-3. **Alternative Trigger**: Alternatively, leave a comment on the issue starting with `@openhands-agent` to activate the resolver.
-4. **Review the Pull Request**: The resolver will generate a pull request with proposed changes. Thoroughly review these changes to ensure they meet your project's standards.
-5. **Provide Feedback**: If the changes are not satisfactory, offer feedback through general comments, review comments, or inline thread comments. Reapply the `fix-me` label to the pull request or address specific comments by starting with `@openhands-agent` to request further modifications.
+- **Required**:
+  - `LLM_API_KEY`: Your LLM API key.
 
-### Custom Configurations
-
-Tailor the behavior of the OpenHands resolver by setting specific repository variables:
-
-- **LLM_MODEL**: Specify the language model to be used with OpenHands.
-- **OPENHANDS_MAX_ITER**: Set the maximum limit for agent iterations.
-- **OPENHANDS_MACRO**: Customize the default macro for invoking the resolver.
-- **OPENHANDS_BASE_CONTAINER_IMAGE**: Define a custom sandbox container image.
-- **TARGET_BRANCH**: Merge to a branch other than `main`.
+- **Optional**:
+  - `PAT_USERNAME`: GitHub username for the personal access token.
+  - `PAT_TOKEN`: The personal access token.
+  - `LLM_BASE_URL`: Base URL for LLM API (only if using a proxy).
 
 ## Automating Issue Creation
 
@@ -80,33 +71,40 @@ To streamline the issue creation process, you can use the `create_issues.py` scr
 python scripts/create_issues.py
 ```
 
-## How to Make Use of This Workflow
+### GitHub Action for Creating Issues
 
-### Using the OpenHands GitHub Action
+The repository includes a GitHub Action that automates the creation of issues from comments. This action is triggered when a comment containing `/create_issues` is added to an issue. Here's how it works:
 
-To use the OpenHands GitHub Action in your own repository, follow these steps:
+- **Trigger**: The action is triggered by an `issue_comment` event with the type `created`.
+- **Criteria**: The comment must contain the text `/create_issues` followed by a list of issues in the format `[[title, body], [title, body]]`.
+- **Job**: The job `create-issues` runs on `ubuntu-latest` and performs the following steps:
+   - Checks out the repository.
+   - Sets up Python and installs the necessary dependencies (`requests` and `aiohttp`).
+   - Extracts issues from the comment body.
+   - Downloads the `create_issues.py` script from the repository.
+   - Creates the issues using the `create_issues.py` script.
+- **Features**:
+    - **Asynchronous Issue Creation:** Issues are created asynchronously for improved performance.
+    - **Error Handling:** The workflow handles potential errors during issue creation and updates the original comment with error messages if any issues fail to be created.
+    - **Rate Limit Handling:** The script handles GitHub API rate limits and retries requests if necessary.
 
-1. **Create an Issue**: Start by creating an issue in your repository that describes the problem or task you want the resolver to address.
-2. **Add the `fix-me` Label**: Add the `fix-me` label to the issue. This will trigger the OpenHands resolver to attempt to resolve the issue.
-3. **Alternative Trigger**: Instead of adding a label, you can leave a comment on the issue starting with `@openhands-agent` to trigger the resolver.
-4. **Review the Pull Request**: The resolver will create a pull request with the proposed changes. Review these changes to ensure they meet your requirements.
-5. **Provide Feedback**: If the changes are not satisfactory, provide feedback through general comments, review comments, or inline thread comments. Add the `fix-me` label to the pull request or address a specific comment by starting with `@openhands-agent` to request further adjustments.
+#### Example Trigger
 
-### Custom Configurations
+To trigger the `create-issues` workflow, add a comment to an issue in the following format:
 
-You can customize the behavior of the OpenHands resolver by setting specific repository variables:
+```
+/create_issues [[Title 1, Body 1], [Title 2, Body 2]]
+```
 
-- **LLM_MODEL**: Set the language model to use with OpenHands.
-- **OPENHANDS_MAX_ITER**: Set the maximum limit for agent iterations.
-- **OPENHANDS_MACRO**: Customize the default macro for invoking the resolver.
-- **OPENHANDS_BASE_CONTAINER_IMAGE**: Specify a custom sandbox container image.
-- **TARGET_BRANCH**: Merge to a branch other than `main`.
+This comment will trigger the workflow to create two issues with the specified titles and bodies.
 
 ## Benefits of the OpenHands Resolver
 
 - **Automation**: Automate repetitive tasks to enhance efficiency and minimize human error.
 - **Consistency**: Ensure adherence to best practices and maintain a consistent codebase.
 - **Integration**: Seamlessly integrate with other GitHub Actions and third-party services.
+
+For more detailed information on using the OpenHands GitHub Action, refer to the [official documentation](https://docs.all-hands.dev/modules/usage/how-to/github-action).
 
 ## Contributing
 

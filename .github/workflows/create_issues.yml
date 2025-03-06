@@ -38,6 +38,14 @@ jobs:
             return;
           }
 
+          // Create initial comment
+          const { data: newComment } = await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `Workflow initialized, you can check the progress [here](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`
+          });
+
           const createdIssues = [];
           const failedIssues = [];
 
@@ -56,8 +64,8 @@ jobs:
               failedIssues.push(title);
             }
           }
-          
-          let commentUpdateBody = '';
+
+          let commentUpdateBody = `Workflow initialized, you can check the progress [here](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).\n\n`;
 
           if (createdIssues.length > 0) {
             commentUpdateBody += 'The following issues were created:\n';
@@ -81,6 +89,6 @@ jobs:
           await github.rest.issues.updateComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            comment_id: context.payload.comment.id,
+            comment_id: newComment.id,
             body: commentUpdateBody,
           });

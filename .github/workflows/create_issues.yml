@@ -1,0 +1,37 @@
+name: Create Issues from Comment
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  create-issues:
+    if: contains(github.event.comment.body, '@create_issues')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: pip install requests
+
+    - name: Extract issues from comment
+      id: extract_issues
+      run: |
+        COMMENT_BODY="${{ github.event.comment.body }}"
+        ISSUES=$(echo "$COMMENT_BODY" | grep -oP '@create_issues\s*\K\[\[.*?\]\]' | head -1)
+        echo "ISSUES=$ISSUES" >> $GITHUB_ENV
+
+    - name: Create issues
+      env:
+        REPO_OWNER: ${{ github.repository_owner }}
+        REPO_NAME: ${{ github.event.repository.name }}
+        AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ISSUES: ${{ env.ISSUES }}
+      run: python scripts/create_issues.py

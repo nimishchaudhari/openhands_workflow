@@ -57,43 +57,26 @@ To ensure the workflow functions correctly, set up the following GitHub secrets 
 
 ## Automating Issue Creation
 
-To streamline the issue creation process, you can use the `create_issues.py` script available in the [scripts directory](https://github.com/nimishchaudhari/openhands_workflow/blob/main/scripts/create_issues.py). This script automates the creation of GitHub issues by leveraging the GitHub API. Here's how you can use it:
-
-1. **Set Up Environment Variables**: Ensure the following environment variables are set:
-   - `REPO_OWNER`: The owner of the repository.
-   - `REPO_NAME`: The name of the repository.
-   - `AUTH_TOKEN`: Your GitHub personal access token.
-   - `ISSUES`: A string representation of a list of tuples, where each tuple contains the title and body of an issue.
-
-2. **Run the Script**: Execute the script to create issues in your repository. The script will read the issues from the `ISSUES` environment variable and create them using the GitHub API.
-
-```bash
-python scripts/create_issues.py
-```
-
 ### GitHub Action for Creating Issues
 
-The repository includes a GitHub Action that automates the creation of issues from comments. This action is triggered when a comment containing `/create_issues` is added to an issue. Here's how it works:
+The repository includes a GitHub Action that automates the creation of issues from comments. This action is triggered when a comment containing `/create_issues` is added to an issue.  It uses the `github-script` action and the built-in `GITHUB_TOKEN`, so no additional secrets need to be configured. Here's how it works:
 
 - **Trigger**: The action is triggered by an `issue_comment` event with the type `created`.
-- **Criteria**: The comment must contain the text `/create_issues` followed by a list of issues in the format `[[title, body], [title, body]]`.
+- **Criteria**: The comment must contain the text `/create_issues` followed by a list of issues in the format `[["title", "body"], ["title", "body"]]`.  Note the use of double quotes.
 - **Job**: The job `create-issues` runs on `ubuntu-latest` and performs the following steps:
-   - Checks out the repository.
-   - Sets up Python and installs the necessary dependencies (`requests` and `aiohttp`).
-   - Extracts issues from the comment body.
-   - Downloads the `create_issues.py` script from the repository.
-   - Creates the issues using the `create_issues.py` script.
+   - Extracts issues from the comment body using `github-script`.
+   - Creates the issues using the GitHub API.
+   - Updates the original comment with links to the created issues, or an error message if issue creation fails.
 - **Features**:
-    - **Asynchronous Issue Creation:** Issues are created asynchronously for improved performance.
-    - **Error Handling:** The workflow handles potential errors during issue creation and updates the original comment with error messages if any issues fail to be created.
-    - **Rate Limit Handling:** The script handles GitHub API rate limits and retries requests if necessary.
+    - **Error Handling:** The workflow handles potential errors during issue creation (e.g., invalid input format) and updates the original comment with error messages.
+    - **No Additional Secrets:**  This workflow uses the built-in `GITHUB_TOKEN` provided by GitHub Actions.  Ensure your repository settings grant "Read and write permissions" to Actions.
 
 #### Example Trigger
 
 To trigger the `create-issues` workflow, add a comment to an issue in the following format:
 
 ```
-/create_issues [[Title 1, Body 1], [Title 2, Body 2]]
+/create_issues [["Title 1", "Body 1"], ["Title 2", "Body 2"]]
 ```
 
 This comment will trigger the workflow to create two issues with the specified titles and bodies.
